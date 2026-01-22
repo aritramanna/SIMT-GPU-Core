@@ -1,4 +1,4 @@
-# SIMT GPU Core Architecture Specification
+# SIMT Core Architecture Specification
 
 ## 1. Executive Summary
 
@@ -6,19 +6,19 @@ The **Kepler-Style SIMT Core** is an **educational, behavioral model** of a Gene
 
 ### Key Features
 
-- **Architecture**: 6-Stage Pipelined SIMT Core (IF, ID, OC, EX, MEM, WB).
+- **Architecture**: 5-Stage Pipelined SIMT Core (IF, ID, OC, EX, WB).
 - **Parallelism**: 32 Threads per Warp, dual-issue capability (up to 2 instructions/cycle).
 - **Multithreading**: Fine-Grained Multithreading (FGMT) with 24 warps (768 threads) and zero-overhead context switching.
 - **Memory Model**:
-  - **Shared Memory**: 16KB On-Chip Scratchpad (32 banks).
-  - **Global Memory**: Coalesced Load/Store Unit (LSU).
+  - **Shared Memory**: 16KB On-Chip Scratchpad (32 banks) with bank-conflict replay.
+  - **Global Memory**: Coalesced Load/Store Unit (LSU) with **Multi-Line Split Support**.
+  - **MSHR**: Up to 64 outstanding memory transactions per warp with out-of-order completion.
 - **Synchronization**: Hardware Barrier (`BAR`) with Epoch consistency.
-- **Control Flow**: Hardware Divergence Stack (SSY/JOIN) for nested branches.
-- **Predication**: 7 predicate registers per thread for conditional execution without branching.
+- **Graphics Pipeline**: Hardware-accelerated 3D wireframe rendering with **Perspective Projection** and dynamic rotation.
 
 ### Main Implementation
 
-The core logic is implemented in [streaming_multiprocessor.sv](../Core/streaming_multiprocessor.sv), which contains the complete 6-stage pipeline, warp scheduler, scoreboard, and execution units.
+The core logic is implemented in [streaming_multiprocessor.sv](../Core/streaming_multiprocessor.sv), which contains the complete 5-stage pipeline, warp scheduler, scoreboard, and execution units.
 
 ---
 
@@ -26,9 +26,13 @@ The core logic is implemented in [streaming_multiprocessor.sv](../Core/streaming
 
 ### 2.1 Pipeline Overview
 
-The core implements an in-order, dual-issue pipeline with out-of-order memory completion.
+The core implements an in-order, dual-issue 5-stage pipeline with out-of-order memory completion.
 
-<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/c68cc99e-d038-4d79-a326-b2ae931872ad" />
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/e5a826c5-36a6-4da0-8130-9ae17e2c2668" />
+
+<img width="2752" height="1536" alt="image" src="https://github.com/user-attachments/assets/c55da357-b4b5-41f4-8b36-38e38a5601cc" />
+
+<img width="2816" height="1536" alt="image" src="https://github.com/user-attachments/assets/7c6707d8-4dd8-4dc3-a08f-62f5798bb0e3" />
 
 
 #### Stage 1: IF (Instruction Fetch)
@@ -296,11 +300,9 @@ ISETP.GT P1, R_x, 0
 @P1 MUL R_y, R_x, 2
 ```
 
-### 4.6 Memory Subsystem (MSHR & Transaction Tracking)
+- **LSU Split Handling**: The LSU automatically detects when a warp's memory accesses span multiple 128-byte cache lines. It utilizes a **Replay Queue** to serialize these into multiple sequential requests to the memory system, transparently to the warp scheduler.
 
-The core implements **out-of-order memory completion** to hide long memory latencies while maintaining correct program semantics.
-
-- **MSHR (Miss Status Holding Registers)**: Each warp has a **64-entry MSHR table** that tracks pending memory operations.
+- **MSHR (Miss Status Holding Registers)**: Each warp has a **64-entry MSHR table** that tracks pending memory operations, allowing the core to hide massive memory latencies.
   - **Transaction ID**: Each memory request is assigned a unique 16-bit ID composed of:
     - `[5:0]` Slot ID (0-63) within the warp's MSHR
     - `[9:6]` Warp ID (0-23)
@@ -514,9 +516,32 @@ TEST PASSED!
 Total Cycles: 487
 ```
 
-### 5.3 Limitations
+### 5.3 Benchmark: 3D Wireframe Cube with Perspective
 
-- **Memory Coalescing**: The current LSU implementation is simplified. It generates one memory request per warp. If threads access non-contiguous cache lines (uncoalesced), the behavior is currently undefined. Future revisions will include a Split/Replay FSM in the LSU.
+The core is capable of full 3D graphics orchestration. A dedicated demo (`TB/TB_SV/test_perspective_cube.sv`) implements:
+
+- **Assembly Shader**: A vertex shader executing 3D rotations (Y-dynamic, X-static) and perspective projection.
+- **Math Engine**: Utilizes the **SFU** for trigonometric functions and **IDIV** for depth-based coordinate scaling ($x_{proj} = x \cdot f / z$).
+- **Rendering**: Directly writes projected vertices into the $64 \times 64$ framebuffer in global memory.
+
+<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/7c77cd3b-b0fb-4d72-8466-1032b8ba3d04" />
+
+### 5.4 Benchmark: Parallel 3D Cube (SIMT Demo)
+
+This kernel parallelizes the 3D Perspective Cube by assigning one thread to each vertex (8 active threads). It demonstrates a ~3x speedup over the sequential version.
+
+```bash
+./verify_specific.sh TB_SV/test_parallel_cube.sv
+```
+
+- **Performance**: 34,368 Cycles (vs 99,312 sequential).
+- **Techniques**: SIMT Parallelism, Predicated Serialization (Software ROP).
+- **Outcome**: Verifies efficient SIMT execution and correct Register File bank conflict handling under heavy load.
+
+### 5.5 Limitations & Future Work
+
+- **Rasterization**: Currently supports point-based vertex rendering; full triangle rasterization is a future milestone.
+- **L1 Cache**: While the LSU supports splits, the current model uses a `mock_memory`. Integration with a genuine set-associative L1 cache is planned as a next step.
 
 ---
 
@@ -569,13 +594,18 @@ The verification environment is organized under the `TB/` directory:
 ```
 TB/
 ├── TB_SV/                          # SystemVerilog Testbenches
-│   ├── test_app_matmul.sv         # Matrix multiplication test
-│   ├── test_barrier.sv             # Barrier synchronization test
-│   ├── test_divergence.sv          # Divergence stack test
-│   ├── test_thread_id.sv           # Thread ID test
-│   ├── test_shared_mem.sv          # Shared memory test
-│   ├── test_predicate.sv           # Predicated execution test
-│   └── test_*.sv                   # Additional test cases
+│   ├── test_alu_ops.sv             # Basic integer arithmetic
+│   ├── test_app_matmul.sv          # 8x8 Tiled Matrix Multiplication
+│   ├── test_control_flow.sv        # Nested branches and divergence
+│   ├── test_fpu_sfu_ops.sv         # FPU and Transcendental functions
+│   ├── test_function_call.sv       # CALL/RET hardware stack
+│   ├── test_lsu_split.sv           # Memory coalescing and split requests
+│   ├── test_memory_system.sv       # MSHR and transaction tracking
+│   ├── test_parallel_cube.sv       # Parallel (SIMT) 3D vertex shader
+│   ├── test_perspective_cube.sv    # 3D Rendering with Perspective
+│   ├── test_pipeline_issue.sv      # Dual-issue structural hazards
+│   ├── test_rotated_cube.sv        # Orthographic 3D rotation
+│   └── test_wireframe_cube.sv      # Basic wireframe orthographic demo
 ├── run_regression.sh               # Regression test runner
 ├── verify_specific.sh              # Single test runner
 └── obj_dir/                        # Verilator build artifacts
@@ -609,3 +639,7 @@ The testbench suite verifies:
 - Matrix multiplication with tiling
 - Thread ID generation
 - Out-of-order memory completion
+- LSU Multi-Line Split Handling
+- LSU Multi-Line Split Handling
+- 3D Perspective Projection & Rotation
+- Parallel Vertex Processing (SIMT)
