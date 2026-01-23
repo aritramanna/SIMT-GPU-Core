@@ -245,6 +245,8 @@ The Operand Collector is a critical microarchitectural feature inspired by NVIDI
   3.  The Arbiter grants access based on bank availability (Interleaved Layout: `Bank = RegID % 4`).
   4.  Once all operands are collected, the CU becomes **READY** and dispatches to the Execution Units.
 
+  <img width="2816" height="1536" alt="image" src="https://github.com/user-attachments/assets/86b3ae2d-6af3-47ca-badc-dc51a82482b1" />
+
 ### 4.2 Divergence Stack (SSY/JOIN)
 
 To handle **Single Instruction, Multiple Threads (SIMT)** divergence on control flow, the core maintains a per-warp **Divergence Stack**.
@@ -259,6 +261,8 @@ To handle **Single Instruction, Multiple Threads (SIMT)** divergence on control 
   2. Restores the full `Active Mask`, re-activating all threads.
 
 This hardware mechanism allows for nested branches and loops without software overhead. **Key Point**: Divergent paths are executed **serially** (one after another), not in parallel, which can reduce effective throughput when warps diverge frequently.
+
+<img width="2816" height="1536" alt="image" src="https://github.com/user-attachments/assets/60d1f5cf-5ec2-4b98-8d15-0d50cbe84521" />
 
 ### 4.3 Shared Memory System
 
