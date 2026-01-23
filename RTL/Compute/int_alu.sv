@@ -14,6 +14,8 @@
  * - FPU/SFU Result Passthrough
  */
 
+import simt_pkg::*;
+
 module int_alu #(
     parameter WARP_SIZE = 32
 )(
@@ -27,8 +29,6 @@ module int_alu #(
     
     output logic [WARP_SIZE-1:0][31:0] result
 );
-    // Import package to get enum values (OP_ADD, etc)
-    import simt_pkg::*;
 
     function automatic int count_leading_zeros(input logic [31:0] val);
         int count = 0;

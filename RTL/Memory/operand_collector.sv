@@ -8,8 +8,9 @@
  * 2. Opcode-based needed_mask: Only collects what it needs.
  * 3. Fair Ready-Release: Round-robin pointer for selecting which READY unit to release to EX.
  */
+import simt_pkg::*;
+
 module operand_collector 
-    import simt_pkg::*;
 #(
     parameter WARP_SIZE = 32,
     parameter NUM_REGS = 64,

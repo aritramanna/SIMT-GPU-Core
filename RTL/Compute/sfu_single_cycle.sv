@@ -8,6 +8,8 @@
  * - 1.15 Fixed-Point arithmetic
  * - Simple interface matching FPU style
  */
+import sfu_pkg::*;
+
 module sfu_single_cycle
 #(
     parameter LUT_SIZE = 256
@@ -16,7 +18,6 @@ module sfu_single_cycle
     input  logic [15:0] operand,    // Input operand (1.15 fixed-point)
     output logic [15:0] result      // Result (1.15 fixed-point)
 );
-    import sfu_pkg::*;
 
     localparam ADDR_BITS = $clog2(LUT_SIZE);
     localparam FRAC_BITS = 16 - ADDR_BITS;

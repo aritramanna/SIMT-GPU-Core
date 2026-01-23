@@ -62,9 +62,10 @@
 //   [OC] Operand Collection & Arbitration -> [EX] Compute/LSU Execute -> 
 //   [WB] Asynchronous Writeback & Scoreboard Clear
 //=============================================================================
+import simt_pkg::*;
+import sfu_pkg::*;
+
 module streaming_multiprocessor
-    import simt_pkg::*;
-    import sfu_pkg::*;
 #(
     parameter WARP_SIZE = 32,
     parameter NUM_WARPS = 24,
