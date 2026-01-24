@@ -548,6 +548,8 @@ This benchmark (`TB/TB_SV/test_parallel_pyramid.sv`) parallelizes the rendering 
 
 - **Outcome**: Verifies correct handled of scatter/gather memory accesses during vertex fetch and predicated atomic writes to the framebuffer.
 
+<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/ab2458c1-ca0f-4f7e-b69b-e8d1360872be" />
+
 ### 5.5 Benchmark: High-Density Parallel Torus (Stress Test)
 
 The most sophisticated stress test for the core (`TB/TB_SV/test_parallel_torus.sv`). It renders a **512-vertex** parametric torus using a full 32-thread warp.
@@ -555,6 +557,8 @@ The most sophisticated stress test for the core (`TB/TB_SV/test_parallel_torus.s
 - **Complexity**: 32 Parallel threads (Tube) x 16 Serial iterations (Ring).
 - **Hardware Hazard Verification**: Targets the **Hardware Predicate Scoreboard**. The shader performs `ISETP` immediately followed by predicated `LDR`/`STR`, verifying that the RTL automatically stalls the pipeline to prevent RAW hazards on predicate bits.
 - **Dynamic Animation**: Features a **Diagonal Tumble** (clockwise rotation on both X and Y axes) implemented via dynamic instruction patching during the simulation loop.
+
+<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/dd2d737d-41f8-4506-b5fd-8b5b2cc76e02" />
 
 ### 5.6 Limitations & Future Work
 
