@@ -368,6 +368,9 @@ module streaming_multiprocessor
     assign stall_fpu_wb = fpu_wb.valid && !fpu_wb_served;
 
     // CENTRAL WRITEBACK ARBITER (Combinational)
+    // Updated to detect and prevent Register File Bank Conflicts
+    // logic stall_mem_wb; // MOVED TO MODULE LEVEL for feedback
+    
     always_comb begin
         oc_wb_valid = 2'b00;
         oc_wb_warp  = '0;
