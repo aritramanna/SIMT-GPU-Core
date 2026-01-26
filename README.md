@@ -652,7 +652,21 @@ The architecture's ability to hide latency through multi-warp interleaving is vi
 | **Throughput**           | 0.017 vertices/cycle                    | 0.069 vertices/cycle                  |
 | **Performance Gain**     | 1x (Baseline)                           | **~3.96x Faster**                     |
 
-**Key Insight**: The Single-Warp test spends ~75% of its time stalled waiting for high-latency SFU (`SIN`/`COS`) and Global Memory operations. The 16-Warp test successfully hides this latency, keeping the execution pipelines saturated.
+**Utilization Visualization**:
+
+<img width="1000" alt="combined_utilization" src="combined_utilization.svg" />
+
+The graph above visualizes the cycle-by-cycle activity of the functional units over the course of rendering 60 frames. Use this to compare the difference in pipeline saturation:
+
+- **Multi-Warp (Top)**:
+  - **Denser Activity**: The utilization curves (Blue/Green/Red) are tightly packed, indicating the scheduler is successfully finding ready warps to issue every cycle.
+  - **Latency Hiding**: Gaps in one warp's execution (due to SFU/Memory latency) are filled by others, resulting in a ~4x faster runtime (~445K cycles total).
+  - **Metrics**: High average utilization (ALU ~64.3%, SFU ~1.3%, LSU ~13.8%) indicates balanced resource usage.
+
+- **Single-Warp (Bottom)**:
+  - **Sparse Activity**: The curves show significant gaps (white space), representing stall cycles where the hardware is idle waiting for `SIN`/`COS` or memory results.
+  - **Linear Runtime**: Because latency cannot be hidden, the total runtime is ~1.76M cycles.
+  - **Metrics**: Lower average utilization (ALU ~13.2%, SFU ~0.2%, LSU ~3.5%) reflects the inability to keep the pipeline full with only a single thread context.
 
 ### 5.7 Limitations & Future Work
 
