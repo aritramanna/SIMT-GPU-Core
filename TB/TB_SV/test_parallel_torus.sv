@@ -302,4 +302,44 @@ module test_parallel_torus;
         $fclose(fd);
     endtask
 
+    // ========================================================================
+    // INSTRUMENTATION LOGGING
+    // ========================================================================
+    integer log_fd;
+    
+    final begin
+        if (log_fd) $fclose(log_fd);
+    end
+
+        initial begin
+        log_fd = $fopen("parallel_warp_utilization.csv", "w");
+        $fwrite(log_fd, "Cycle,ALU_Active,SFU_Active,LSU_Active,Active_Warps\n");
+        
+        forever begin
+            @(posedge clk);
+            if (rst_n) begin
+                 logic alu_active, sfu_active, lsu_active;
+                 int aw;
+                 
+                 // ALU Retired
+                 alu_active = dut.alu_wb.valid;
+                 
+                 // SFU Retired
+                 sfu_active = dut.fpu_wb.valid;
+                 
+                 // LSU Retired (Load Return | Store Issue)
+                 lsu_active = dut.mem_resp_wb.valid | 
+                              (dut.lsu_mem.valid && dut.lsu_mem.op == OP_STR);
+                 
+                 // Count Active Warps
+                 aw = 0;
+                 for(int i=0; i<24; i++) begin
+                     if(dut.warp_state[i] != W_IDLE) aw++;
+                 end
+                 
+                 $fwrite(log_fd, "%0d,%0d,%0d,%0d,%0d\n", cycle, alu_active, sfu_active, lsu_active, aw);
+            end
+        end
+    end
+
 endmodule

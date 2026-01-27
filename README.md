@@ -656,7 +656,8 @@ This architectural efficiency translates directly to visual fluidity: the Single
 | **Total Threads**        | 32 Active                               | 512 Active                            |
 | **Avg Cycles per Frame** | **~29,363**                             | **~7,415**                            |
 | **Throughput**           | 0.017 vertices/cycle                    | 0.069 vertices/cycle                  |
-| **Performance Gain**     | 1x (Baseline)                           | **~3.96x Faster**                     |
+| **Performance Gain**     | 1x (Baseline)                           | **~4.0x Faster**                      |
+| **Avg IPC (Peak 2.0)**   | **0.82**                                | **1.45** (72% of Peak)                |
 
 **Utilization Visualization**:
 

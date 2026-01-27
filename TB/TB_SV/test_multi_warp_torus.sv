@@ -281,4 +281,48 @@ module test_multi_warp_torus;
         $fclose(fd);
     endtask
 
+    // ========================================================================
+    // INSTRUMENTATION LOGGING
+    // ========================================================================
+    integer log_fd;
+    
+    final begin
+        if (log_fd) $fclose(log_fd);
+    end
+
+        initial begin
+        log_fd = $fopen("multi_warp_utilization.csv", "w");
+        $fwrite(log_fd, "Cycle,ALU_Active,SFU_Active,LSU_Active,Active_Warps\n");
+        
+        forever begin
+            @(posedge clk);
+            if (rst_n) begin
+                 logic alu_active, sfu_active, lsu_active;
+                 int aw;
+                 
+                 // ALU Retired: Valid writeback from ALU pipeline
+                 // Note: This misses control flow (BRA/BAR) that doesn't writeback, 
+                 // but captures all compute.
+                 alu_active = dut.alu_wb.valid;
+                 
+                 // SFU Retired: Valid writeback from FPU/SFU pipeline
+                 sfu_active = dut.fpu_wb.valid;
+                 
+                 // LSU Retired: 
+                 // 1. Loads Retiring (Memory Response writing back)
+                 // 2. Stores Issuing (LSU Request valid AND is Store)
+                 lsu_active = dut.mem_resp_wb.valid | 
+                              (dut.lsu_mem.valid && dut.lsu_mem.op == OP_STR);
+                 
+                 // Count Active Warps
+                 aw = 0;
+                 for(int i=0; i<16; i++) begin
+                     if(dut.warp_state[i] != W_IDLE) aw++;
+                 end
+                 
+                 $fwrite(log_fd, "%0d,%0d,%0d,%0d,%0d\n", cycle, alu_active, sfu_active, lsu_active, aw);
+            end
+        end
+    end
+
 endmodule
