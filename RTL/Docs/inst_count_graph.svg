@@ -1,0 +1,43 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="100%" height="100%" fill="#1e1e1e"/>
+    
+    <!-- Title -->
+    <text x="300.0" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">Work Efficiency: Total Instructions per Frame</text>
+    
+    <!-- Y-Axis Grid & Labels -->
+    <line x1="60" y1="340.0" x2="540" y2="340.0" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="344.0" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">0k</text><line x1="60" y1="293.3333333333333" x2="540" y2="293.3333333333333" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="297.3333333333333" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">5k</text><line x1="60" y1="246.66666666666666" x2="540" y2="246.66666666666666" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="250.66666666666666" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">10k</text><line x1="60" y1="200.0" x2="540" y2="200.0" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="204.0" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">15k</text><line x1="60" y1="153.33333333333331" x2="540" y2="153.33333333333331" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="157.33333333333331" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">20k</text><line x1="60" y1="106.66666666666666" x2="540" y2="106.66666666666666" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="110.66666666666666" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">25k</text><line x1="60" y1="60.0" x2="540" y2="60.0" stroke="#444444" stroke-width="1" stroke-dasharray="4"/><text x="50" y="64.0" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="end">30k</text>
+    <!-- Axes -->
+    <line x1="60" y1="340" x2="540" y2="340" stroke="#aaaaaa" stroke-width="2"/>
+    <line x1="60" y1="60" x2="60" y2="340" stroke="#aaaaaa" stroke-width="2"/>
+    
+    <!-- Label Y -->
+    <text x="20" y="200.0" transform="rotate(-90, 20, 200.0)" font-family="Arial, sans-serif" font-size="12" fill="#aaaaaa" text-anchor="middle">Instructions Executed</text>
+    
+    <!-- Bars -->
+    <rect x="140" y="116.13066666666666" width="100" height="223.86933333333334" fill="#ff4d4d" rx="4" ry="4"/>
+    <rect x="340" y="239.312" width="100" height="100.688" fill="#00ff9d" rx="4" ry="4"/>
+    
+    <!-- Values on Bars -->
+    <text x="190.0" y="106.13066666666666" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">23,986</text>
+    <text x="390.0" y="229.312" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">10,788</text>
+    
+    <!-- X Labels -->
+    <text x="190.0" y="360" font-family="Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="middle">Single Warp</text>
+    <text x="190.0" y="375" font-family="Arial, sans-serif" font-size="10" fill="#aaaaaa" text-anchor="middle">(Software Loop)</text>
+    
+    <text x="390.0" y="360" font-family="Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="middle">Multi-Warp</text>
+    <text x="390.0" y="375" font-family="Arial, sans-serif" font-size="10" fill="#aaaaaa" text-anchor="middle">(Parallel Unroll)</text>
+    
+    <!-- Annotation Arrow -->
+    <path d="M 250 136.13066666666666 Q 290.0 166.13066666666666 330 219.312" fill="none" stroke="#ffcc00" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="290.0" y="199.312" font-family="Arial, sans-serif" font-size="12" fill="#ffcc00" text-anchor="middle" font-weight="bold">~2.2x Reduction</text>
+    <text x="290.0" y="214.312" font-family="Arial, sans-serif" font-size="10" fill="#ffcc00" text-anchor="middle">(No Loop Overhead)</text>
+    
+    <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffcc00" />
+    </marker>
+  </defs>
+    
+    </svg>

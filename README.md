@@ -670,6 +670,14 @@ The total speedup is a compound effect of two factors:
 
 ![IPC Scaling Graph](RTL/Docs/ipc_scaling_graph.svg)
 
+### Work Efficiency: Instruction Count Reduction
+
+The Single-Warp implementation relies on a software loop (16 iterations) to process the geometry, incurring significant overhead from loop control instructions (Compare, Branch, Add) that do not contribute directly to the result.
+
+In contrast, the Multi-Warp implementation "unrolls" this work across the hardware. 16 warps execute the shader body in parallel without looping, reducing the total instruction count by **~2.2x**. This algorithmic efficiency (doing less work) combined with higher IPC (doing work faster) creates the total 4.0x speedup.
+
+![Instruction Count Graph](RTL/Docs/inst_count_graph.svg)
+
 **Utilization Visualization**:
 
 <img width="1000" alt="combined_utilization" src="combined_utilization.svg" />
