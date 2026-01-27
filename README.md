@@ -660,7 +660,13 @@ This architectural efficiency translates directly to visual fluidity: the Single
 
 ### IPC Scaling Analysis
 
-The graph below illustrates the architectural efficiency gain. While the Single-Warp configuration is bottlenecked by latency (~0.82 IPC), the Multi-Warp scheduler effectively saturates the dual-issue pipeline, reaching **1.45 IPC** (72% of theoretical peak).
+The graph below illustrates the architectural efficiency gain. While the Single-Warp configuration is bottlenecked by latency (~0.82 IPC), the Multi-Warp scheduler saturates the dual-issue pipeline (~1.45 IPC).
+
+**Note on the 4.0x Speedup**:
+The total speedup is a compound effect of two factors:
+
+1.  **Latency Hiding (1.77x)**: Multi-warp interleaving increases IPC from 0.82 to 1.45.
+2.  **Hardware Unrolling (~2.25x)**: Use of 16 parallel warps eliminates the software loop overhead (branch/increment instructions) required in the single-warp implementation.
 
 ![IPC Scaling Graph](RTL/Docs/ipc_scaling_graph.svg)
 
