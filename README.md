@@ -28,9 +28,7 @@ The core logic is implemented in [streaming_multiprocessor.sv](../Core/streaming
 
 The core implements an in-order, dual-issue 5-stage pipeline with out-of-order memory completion.
 
-<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/e5a826c5-36a6-4da0-8130-9ae17e2c2668" />
-
-<img width="2752" height="1536" alt="image" src="https://github.com/user-attachments/assets/c55da357-b4b5-41f4-8b36-38e38a5601cc" />
+![SIMT Core Pipeline](RTL/Docs/simt_full_pipeline.png)
 
 <img width="2816" height="1536" alt="image" src="https://github.com/user-attachments/assets/7c6707d8-4dd8-4dc3-a08f-62f5798bb0e3" />
 
@@ -733,15 +731,15 @@ RTL/
 
 ### Key Modules
 
-| Module                        | Description                                     | Lines of Code |
-| :---------------------------- | :---------------------------------------------- | :------------ |
-| `streaming_multiprocessor.sv` | Top-level SM with complete 6-stage pipeline     | ~2,161        |
-| `operand_collector.sv`        | Banked register file with conflict resolution   | ~222          |
-| `simt_pkg.sv`                 | Package definitions (opcodes, types, functions) | ~413          |
-| `shared_memory.sv`            | 32-bank shared memory with conflict detection   | ~107          |
-| `ALU.sv`                      | 32-lane integer arithmetic logic unit           | ~500+         |
-| `FPU.sv`                      | IEEE-754 floating-point unit                    | ~300+         |
-| `SFU.sv`                      | Transcendental function unit                    | ~200+         |
+| Module                        | Description                                     |
+| :---------------------------- | :---------------------------------------------- |
+| `streaming_multiprocessor.sv` | Top-level SM with complete 6-stage pipeline     |
+| `operand_collector.sv`        | Banked register file with conflict resolution   |
+| `simt_pkg.sv`                 | Package definitions (opcodes, types, functions) |
+| `shared_memory.sv`            | 32-bank shared memory with conflict detection   |
+| `ALU.sv`                      | 32-lane integer arithmetic logic unit           |
+| `FPU.sv`                      | IEEE-754 floating-point unit                    |
+| `SFU.sv`                      | Transcendental function unit                    |
 
 ---
 
