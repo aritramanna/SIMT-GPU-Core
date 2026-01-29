@@ -1673,41 +1673,7 @@ module streaming_multiprocessor
     logic split_is_last;
     int   split_leader;
     logic mem_request_valid;
-    
-    // Helper to find first active lane
-    function automatic int get_first_active_lane(logic [WARP_SIZE-1:0] mask);
-        for(int i=0; i<WARP_SIZE; i++) if(mask[i]) return i;
-        return 0;
-    endfunction
-    
-    // Helper to count number of splits needed
-    function automatic int count_splits(logic [WARP_SIZE-1:0] mask, logic [WARP_SIZE-1:0][31:0] addrs);
-        logic [WARP_SIZE-1:0] remaining_mask;
-        int split_count;
-        int leader;
-        
-        remaining_mask = mask;
-        split_count = 0;
-        
-        while (remaining_mask != 0) begin
-            logic [WARP_SIZE-1:0] this_split_mask;
-            leader = get_first_active_lane(remaining_mask);
-            this_split_mask = '0;
-            
-            // Find all threads in same cache line as leader
-            for (int i=0; i<WARP_SIZE; i++) begin
-                if (remaining_mask[i] && (addrs[i][31:7] == addrs[leader][31:7])) begin
-                    this_split_mask[i] = 1;
-                end
-            end
-            
-            remaining_mask = remaining_mask & ~this_split_mask;
-            split_count++;
-        end
-        
-        return split_count;
-    endfunction
-    
+
     // ========================================================================
     // Replay Arbiter (Round-Robin)
     // ========================================================================

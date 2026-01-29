@@ -34,7 +34,7 @@ package simt_pkg;
     // |                  | IMAD             | IMAD R1, R2, R3, R4        | d = a * b + c                         |
     // |                  | IDIV             | IDIV R1, R2, R3            | d = a / b (Signed)                    |
     // |                  | IREM             | IREM R1, R2, R3            | d = a % b (Signed)                    |
-    // |                  | IABS             | IABS R1, R2                | d = |a|                             |
+    // |                  | IABS             | IABS R1, R2                | d = |a|                               |
     // |                  | NEG              | NEG R1, R2                 | d = -a                                |
     // |                  | IMIN             | IMIN R1, R2, R3            | d = (a < b) ? a : b                   |
     // |                  | IMAX             | IMAX R1, R2, R3            | d = (a > b) ? a : b                   |
@@ -46,7 +46,7 @@ package simt_pkg;
     // |                  | SLE              | SLE R1, R2, R3             | d = (a <= b) ? 1 : 0                  |
     // |                  | SEQ              | SEQ R1, R2, R3             | d = (a == b) ? 1 : 0                  |
     // | **Logic**        | AND              | AND R1, R2, R3             | d = a & b                             |
-    // |                  | OR               | OR R1, R2, R3              | d = a | b                            |
+    // |                  | OR               | OR R1, R2, R3              | d = a | b                             |
     // |                  | XOR              | XOR R1, R2, R3             | d = a ^ b                             |
     // |                  | NOT              | NOT R1, R2                 | d = ~a                                |
     // |                  | SHL              | SHL R1, R2, R3             | d = a << b                            |
@@ -59,7 +59,7 @@ package simt_pkg;
     // |                  | FFMA             | FFMA R1, R2, R3, R4        | d = a * b + c                         |
     // |                  | FMIN             | FMIN R1, R2, R3            | d = min(a, b)                         |
     // |                  | FMAX             | FMAX R1, R2, R3            | d = max(a, b)                         |
-    // |                  | FABS             | FABS R1, R2                | d = |a|                             |
+    // |                  | FABS             | FABS R1, R2                | d = |a|                               |
     // |                  | FNEG             | FNEG R1, R2                | d = -a (Sign Flip)                    |
     // |                  | FTOI             | FTOI R1, R2                | d = (int)a                            |
     // |                  | ITOF             | ITOF R1, R2                | d = (float)a                          |
@@ -451,6 +451,40 @@ package simt_pkg;
         
         // Can dual-issue if no hazards
         can_dual_issue = !raw_hazard && !structural_hazard && !control_hazard;
+    endfunction
+
+    // Helper to find first active lane
+    function automatic int get_first_active_lane(logic [WARP_SIZE-1:0] mask);
+        for(int i=0; i<WARP_SIZE; i++) if(mask[i]) return i;
+        return 0;
+    endfunction
+    
+    // Helper to count number of splits needed
+    function automatic int count_splits(logic [WARP_SIZE-1:0] mask, logic [WARP_SIZE-1:0][31:0] addrs);
+        logic [WARP_SIZE-1:0] remaining_mask;
+        int split_count;
+        int leader;
+        
+        remaining_mask = mask;
+        split_count = 0;
+        
+        while (remaining_mask != 0) begin
+            logic [WARP_SIZE-1:0] this_split_mask;
+            leader = get_first_active_lane(remaining_mask);
+            this_split_mask = '0;
+            
+            // Find all threads in same cache line as leader
+            for (int i=0; i<WARP_SIZE; i++) begin
+                if (remaining_mask[i] && (addrs[i][31:7] == addrs[leader][31:7])) begin
+                    this_split_mask[i] = 1;
+                end
+            end
+            
+            remaining_mask = remaining_mask & ~this_split_mask;
+            split_count++;
+        end
+        
+        return split_count;
     endfunction
 
 endpackage
