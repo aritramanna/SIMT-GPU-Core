@@ -1769,7 +1769,7 @@ module streaming_multiprocessor
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             for (int w=0; w<NUM_WARPS; w++) begin
-                replay_queue[w] <= '{valid:0, pending_mask:0, warp:0, rd:0, op:0, addresses:0, store_data:0};
+                replay_queue[w] <= '{valid:0, pending_mask:0, warp:0, rd:0, op:OP_NOP, addresses:0, store_data:0};
             end
         end else begin
             // Update replay queue when requests are issued
@@ -1789,7 +1789,7 @@ module streaming_multiprocessor
                     if (!split_is_last) begin
                         replay_queue[warp_idx].valid <= 1;
                         replay_queue[warp_idx].pending_mask <= next_split_mask;
-                        replay_queue[warp_idx].warp <= current_lsu_request.warp;
+                        replay_queue[warp_idx].warp <= 8'(current_lsu_request.warp);
                         replay_queue[warp_idx].rd <= current_lsu_request.rd;
                         replay_queue[warp_idx].op <= current_lsu_request.op;
                         replay_queue[warp_idx].addresses <= current_lsu_request.addresses;
@@ -2460,7 +2460,7 @@ module streaming_multiprocessor
         end
 
         // ALU EX Stage: BAR Arrival (Waits for MSHR Drain for Consistency)
-        if (alu_valid_exec && alu_can_commit && (alu_inst_exec.branch_tag == warp_branch_tag[alu_inst_exec.warp])) begin
+        if (alu_valid_exec && alu_can_commit && (alu_inst_exec.branch_tag == warp_branch_tag[WARP_ID_WIDTH'(alu_inst_exec.warp)])) begin
             if (alu_inst_exec.op == OP_BAR) begin
                 // Memory Consistency: Ensure all previous loads have retired
                 if (mshr_count[alu_inst_exec.warp] == 0) begin
@@ -2479,7 +2479,7 @@ module streaming_multiprocessor
                     if (barrier_expected[i] && warp_state[i] == W_BARRIER)
                         state_req_ready[i] = 1;
                 end
-                state_req_ready[alu_inst_exec.warp] = 1;
+                state_req_ready[WARP_ID_WIDTH'(alu_inst_exec.warp)] = 1;
             end
         end
     end
