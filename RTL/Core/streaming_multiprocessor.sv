@@ -57,10 +57,22 @@
 //      - Supports split-transaction writebacks, allowing other warps to progress 
 //        while memory requests are in flight.
 //
-// PIPELINE TOPOLOGY:
-//   [IF] Fetch & Dual-Issue Check -> [ID] Decode & Scoreboard Reserve -> 
-//   [OC] Operand Collection & Arbitration -> [EX] Compute/LSU Execute -> 
-//   [WB] Asynchronous Writeback & Scoreboard Clear
+// CODE ORGANIZATION:
+//   1.  Module Header & Parameters
+//   2.  Architectural State (PC, Registers, Scoreboard, Barriers)
+//   3.  Pipeline Registers & FIFO Definitions
+//   4.  Operand Collector Instantiation
+//   5.  [IF] Instruction Fetch & Scheduler (Dual-Issue Logic)
+//   6.  [ID] Instruction Decode & Dispatch Router
+//   7.  [EX] Execute Stage
+//       - [ALU] Integer/Branch Pipeline
+//       - [FPU] Floating Point / SFU Pipeline
+//       - [LSU] Address Generation
+//   8.  [MEM] Memory Stage
+//       - LSU Replay Queue (Split Operations)
+//       - Mock Memory & Shared Memory Interfaces
+//   9.  [WB] Memory Response & MSHR Handling
+//   10. [WB] Central Writeback Arbiter 
 //=============================================================================
 import simt_pkg::*;
 import sfu_pkg::*;
@@ -181,8 +193,6 @@ module streaming_multiprocessor
     always_comb begin
         for (int w=0; w<NUM_WARPS; w++) begin
             // 1. Pop Logic: Allocation pops. 
-            // FIXED: Only pop if we are NOT in init phase and not pushing (or handling properly)
-            // But wait, the user said arbitrate explicitly.
             tx_id_fifo_pop[w]  = alloc_pop[w];
             
             // 2. Push Logic: Init OR Reclaim
@@ -242,20 +252,13 @@ module streaming_multiprocessor
         // Clear Scoreboard from OC Writeback Ports (Sync & Async)
         for (int k=0; k<2; k++) begin
             if (oc_wb_valid[k]) begin
-                // ONLY clear if this is the generic ALU/FPU path (always full) 
-                // OR if it's a Memory path and this is the LAST split.
-                // Note: oc_wb_last_split is needed here.
-                // Assuming logic added via implicit wire connection or we decode src
-                // For simplified logic: checks specific to Memory WB logic below
+                // Default: Clear the register scoreboard entry
                 reg_clear_this_cycle[oc_wb_warp[k]][oc_wb_rd[k]] = 1;
 
-                // Optimization: We could qualify with last_split here if we routed it.
-                // For now, let's rely on the upstream (Atomic WB) NOT setting Valid if it shouldn't clear?
-                // NO. WB must happen for data.
-                // We MUST access `mem_resp_wb.last_split`.
-                // Port 1 is driven by mem_resp_wb. 
+                // SPECIAL CASE: Memory Operations
+                // Port 1 is driven by mem_resp_wb. Memory ops may be split (multiple chunks).
+                // We must ONLY clear the scoreboard on the LAST split.
                 if (k == 1 && mem_resp_wb.valid) begin
-                    // Override: Only clear if last_split is true
                     reg_clear_this_cycle[oc_wb_warp[k]][oc_wb_rd[k]] = mem_resp_wb.last_split;
                 end
             end
@@ -345,9 +348,7 @@ module streaming_multiprocessor
     // Writeback Port 0 (Sync - ALU)
     // Directly driven by ALU Pipeline Register (alu_wb)
     // Writeback Pipeline Registers
-    // alu_wb and lsu_mem are declared in Execution Stage Header (lines 193/205)
-    // mem_wb_t alu_wb;     // Path A: Compute (ALU) - ALREADY DECLARED
-    // mem_wb_t lsu_mem;    // Path B: Memory Request (LSU) - Bridge - ALREADY DECLARED
+    // alu_wb is declared in Execution Stage Header
     mem_wb_t fpu_wb;     // Path C: FPU/SFU
     mem_wb_t mem_resp_wb;// Path D: Memory Response (Async)
     mem_wb_t mem_resp_wb_next; // Next-state for atomic WB
@@ -359,55 +360,7 @@ module streaming_multiprocessor
 
     // CENTRAL WRITEBACK ARBITER (Combinational)
     // Updated to detect and prevent Register File Bank Conflicts
-    // logic stall_mem_wb; // MOVED TO MODULE LEVEL for feedback
     
-    always_comb begin
-        oc_wb_valid = 2'b00;
-        oc_wb_warp  = '0;
-        oc_wb_rd    = '0;
-        oc_wb_mask  = '0;
-        oc_wb_data  = '0;
-        oc_wb_we_pred = '0;  // Initialize predicate write enable
-        fpu_wb_served = 0;
-
-        // Port 0: Priority ALU -> FPU
-        // Use .valid (not .we) to ensure Scoreboard clears even for squashed/predicated-off ops
-        if (alu_wb.valid) begin
-            oc_wb_valid[0] = 1;
-            oc_wb_warp[0]  = alu_wb.warp;
-            oc_wb_rd[0]    = alu_wb.rd[REG_ADDR_WIDTH-1:0];
-            oc_wb_mask[0]  = alu_wb.we ? alu_wb.mask : '0; 
-            oc_wb_data[0]  = alu_wb.result;
-            oc_wb_we_pred[0] = alu_wb.we_pred;  // Propagate predicate write enable
-        end else if (fpu_wb.valid) begin
-            oc_wb_valid[0] = 1;
-            oc_wb_warp[0]  = fpu_wb.warp;
-            oc_wb_rd[0]    = fpu_wb.rd[REG_ADDR_WIDTH-1:0];
-            oc_wb_mask[0]  = fpu_wb.we ? fpu_wb.mask : '0;
-            oc_wb_data[0]  = fpu_wb.result;
-            oc_wb_we_pred[0] = fpu_wb.we_pred;  // Propagate predicate write enable
-            fpu_wb_served  = 1;
-        end
-
-        // Port 1: Priority MEM_RESP -> FPU
-        if (mem_resp_wb.valid) begin
-             oc_wb_valid[1] = 1;
-             oc_wb_warp[1]  = mem_resp_wb.warp;
-             oc_wb_rd[1]    = mem_resp_wb.rd[REG_ADDR_WIDTH-1:0];
-             oc_wb_mask[1]  = mem_resp_wb.we ? mem_resp_wb.mask : '0;
-             oc_wb_data[1]  = mem_resp_wb.result;
-             oc_wb_we_pred[1] = mem_resp_wb.we_pred;  // Propagate predicate write enable
-        end else if (fpu_wb.valid && !fpu_wb_served) begin
-             oc_wb_valid[1] = 1;
-             oc_wb_warp[1]  = fpu_wb.warp;
-             oc_wb_rd[1]    = fpu_wb.rd[REG_ADDR_WIDTH-1:0];
-             oc_wb_mask[1]  = fpu_wb.we ? fpu_wb.mask : '0;
-             oc_wb_data[1]  = fpu_wb.result;
-             oc_wb_we_pred[1] = fpu_wb.we_pred;  // Propagate predicate write enable
-             fpu_wb_served  = 1;
-        end
-    end
-
     // Barrier State
     logic [NUM_WARPS-1:0] barrier_mask;
     logic [NUM_WARPS-1:0] barrier_expected; // Tracks warps participating in the CTA
@@ -1191,7 +1144,7 @@ module streaming_multiprocessor
         end
     end
     
-    // Branch evaluation moved to EX stage sequential block
+
 
     // FPU Execution Mask
     always_comb begin
@@ -1888,15 +1841,8 @@ module streaming_multiprocessor
     logic [WARP_SIZE-1:0][31:0] shared_rdata;
 
     // Shared Memory Pipeline Register (for 1-cycle latency)
-
     shared_wb_req_t shared_wb_req_q;
-
-
     shared_wb_resp_t shared_wb_resp_q;
-
-
-
-    // Output Registers from Cache Read
     logic [1023:0] l1_rdata_latched;
 
     // Address Conversion Logic (Word Index -> Byte Address)
@@ -2260,13 +2206,7 @@ module streaming_multiprocessor
             mshr_count[cur_w] <= next_cnt;
         end
         
-        // -----------------------
-        // PIPELINE WRITEBACK (Priority 2)
-        // -----------------------
-        if (mem_wb.valid && mem_wb.we) begin
-            // Sync writeback logic is now handled by oc_wb[0] assignment (combinational or driven by OC)
-            // Removed redundant direct GPR writes
-        end
+
         end
     end
     
@@ -2276,6 +2216,60 @@ module streaming_multiprocessor
                                       tx_id_fifo_dout[lsu_mem.warp[WARP_ID_WIDTH-1:0]] :  // Peek at front of LSU warp's FIFO
                                       16'h0;
 
+    //=========================================================================
+    // PIPELINE STAGE: CENTRAL WRITEBACK ARBITER (Combinational)
+    //=========================================================================
+    // - Arbitrates between ALU, FPU, and Memory Writebacks
+    // - Maps sources to the 2 Writeback Ports of the Operand Collector
+    // - Handles predicate writeback forwarding
+    //=========================================================================
+    always_comb begin
+        oc_wb_valid = 2'b00;
+        oc_wb_warp  = '0;
+        oc_wb_rd    = '0;
+        oc_wb_mask  = '0;
+        oc_wb_data  = '0;
+        oc_wb_we_pred = '0;  // Initialize predicate write enable
+        fpu_wb_served = 0;
+
+        // Port 0: Priority ALU -> FPU
+        // Use .valid (not .we) to ensure Scoreboard clears even for squashed/predicated-off ops
+        if (alu_wb.valid) begin
+            oc_wb_valid[0] = 1;
+            oc_wb_warp[0]  = alu_wb.warp;
+            oc_wb_rd[0]    = alu_wb.rd[REG_ADDR_WIDTH-1:0];
+            oc_wb_mask[0]  = alu_wb.we ? alu_wb.mask : '0; 
+            oc_wb_data[0]  = alu_wb.result;
+            oc_wb_we_pred[0] = alu_wb.we_pred;  // Propagate predicate write enable
+        end else if (fpu_wb.valid) begin
+            oc_wb_valid[0] = 1;
+            oc_wb_warp[0]  = fpu_wb.warp;
+            oc_wb_rd[0]    = fpu_wb.rd[REG_ADDR_WIDTH-1:0];
+            oc_wb_mask[0]  = fpu_wb.we ? fpu_wb.mask : '0;
+            oc_wb_data[0]  = fpu_wb.result;
+            oc_wb_we_pred[0] = fpu_wb.we_pred;  // Propagate predicate write enable
+            fpu_wb_served  = 1;
+        end
+
+        // Port 1: Priority MEM_RESP -> FPU
+        if (mem_resp_wb.valid) begin
+             oc_wb_valid[1] = 1;
+             oc_wb_warp[1]  = mem_resp_wb.warp;
+             oc_wb_rd[1]    = mem_resp_wb.rd[REG_ADDR_WIDTH-1:0];
+             oc_wb_mask[1]  = mem_resp_wb.we ? mem_resp_wb.mask : '0;
+             oc_wb_data[1]  = mem_resp_wb.result;
+             oc_wb_we_pred[1] = mem_resp_wb.we_pred;  // Propagate predicate write enable
+        end else if (fpu_wb.valid && !fpu_wb_served) begin
+             oc_wb_valid[1] = 1;
+             oc_wb_warp[1]  = fpu_wb.warp;
+             oc_wb_rd[1]    = fpu_wb.rd[REG_ADDR_WIDTH-1:0];
+             oc_wb_mask[1]  = fpu_wb.we ? fpu_wb.mask : '0;
+             oc_wb_data[1]  = fpu_wb.result;
+             oc_wb_we_pred[1] = fpu_wb.we_pred;  // Propagate predicate write enable
+             fpu_wb_served  = 1;
+        end
+    end
+
     // Simulation Control & Initialization
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -2283,7 +2277,7 @@ module streaming_multiprocessor
             cycle <= 0;
             done  <= 0;
             done_prev <= 0;
-            done_prev <= 0;
+
             barrier_mask       <= 0;
             barrier_expected   <= 0; // Initialize to 0, latch active warps below
             barrier_epoch      <= 0;
@@ -2291,14 +2285,7 @@ module streaming_multiprocessor
             barrier_active     <= 0;
             barrier_initialized <= 0;
             
-            // Initialize MSHR tables
-            // MSHR Init moved to Unified Driver
-            
-            // Clear Init Signals
-            for (int w=0; w<NUM_WARPS; w++) begin
-                init_push[w] <= 0;
-            end
-            
+
             for (int w=0; w<NUM_WARPS; w++) begin
                 // All architectural state is now managed and reset in the 
                 // relevant pipeline stage blocks (Scheduler, ID) to avoid multiple drivers.
