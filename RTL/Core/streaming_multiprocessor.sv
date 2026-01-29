@@ -275,15 +275,6 @@ module streaming_multiprocessor
     alu_wb_t alu_wb;
     
     // LSU Pipeline: ADDR → MEM (multi-cycle, async)
-    typedef struct packed {
-        logic valid;
-        logic [4:0] warp;
-        opcode_t op;
-        logic [7:0] rd;
-        logic [WARP_SIZE-1:0] mask;
-        logic [WARP_SIZE-1:0][31:0] addresses;
-        logic [WARP_SIZE-1:0][31:0] store_data;
-    } lsu_mem_t;
     lsu_mem_t lsu_mem;
     
     // Temporary: Keep ex_mem for compatibility during transition
@@ -1709,15 +1700,7 @@ module streaming_multiprocessor
     // ========================================================================
     
     // Replay Queue Entry Structure
-    typedef struct packed {
-        logic valid;
-        logic [WARP_SIZE-1:0] pending_mask;
-        logic [7:0] warp;
-        logic [7:0] rd;
-        logic [7:0] op;
-        logic [WARP_SIZE-1:0][31:0] addresses;
-        logic [WARP_SIZE-1:0][31:0] store_data;
-    } replay_entry_t;
+
     
     // Per-warp replay queue (one entry per warp)
     replay_entry_t replay_queue [NUM_WARPS];
@@ -1905,21 +1888,10 @@ module streaming_multiprocessor
     logic [WARP_SIZE-1:0][31:0] shared_rdata;
 
     // Shared Memory Pipeline Register (for 1-cycle latency)
-    typedef struct packed {
-        logic valid;
-        logic [WARP_ID_WIDTH-1:0] warp;
-        logic [REG_ADDR_WIDTH-1:0] rd;
-        logic [WARP_SIZE-1:0] mask;
-    } shared_wb_req_t;
+
     shared_wb_req_t shared_wb_req_q;
 
-    typedef struct packed {
-        logic valid;
-        logic [WARP_ID_WIDTH-1:0] warp;
-        logic [REG_ADDR_WIDTH-1:0] rd;
-        logic [WARP_SIZE-1:0] mask;
-        logic [WARP_SIZE-1:0][31:0] data;
-    } shared_wb_resp_t;
+
     shared_wb_resp_t shared_wb_resp_q;
 
 
@@ -2559,13 +2531,4 @@ module streaming_multiprocessor
         end
     end
 
-    // Warp 7 diagnostic block
-    always_ff @(posedge clk) begin
-        static int cycle_diag = 0;
-        cycle_diag++;
-        if (cycle_diag % 100 == 0) begin
-            $display("CORE [%0t] WARP7_DIAG: PC=%h State=%s SB=%b PredSB=%b MSHR=%d", 
-                     $time, warp_pc[7], warp_state[7].name(), warp_reg_writes[7], warp_pred_writes[7], mshr_count[7]);
-        end
-    end
 endmodule

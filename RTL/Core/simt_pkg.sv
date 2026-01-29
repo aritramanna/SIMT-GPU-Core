@@ -16,6 +16,7 @@ package simt_pkg;
     
     // Derived parameter (for default configuration)
     localparam WARP_ID_WIDTH  = $clog2(NUM_WARPS);  // 2 bits for 4 warps
+    localparam REG_ADDR_WIDTH = $clog2(NUM_REGS);
     
     // Note: Package types use WARP_ID_WIDTH from the package defaults
     // Individual modules override NUM_WARPS and calculate their own WARP_ID_WIDTH
@@ -285,6 +286,17 @@ package simt_pkg;
         logic we_pred;
     } alu_wb_t;
 
+    // LSU Pipeline: ADDR -> MEM (multi-cycle, async)
+    typedef struct packed {
+        logic valid;
+        logic [4:0] warp;
+        opcode_t op;
+        logic [7:0] rd;
+        logic [WARP_SIZE-1:0] mask;
+        logic [WARP_SIZE-1:0][31:0] addresses;
+        logic [WARP_SIZE-1:0][31:0] store_data;
+    } lsu_mem_t;
+
     //=========================================================================
     // Warp Context / Status Structure
     //=========================================================================
@@ -336,6 +348,33 @@ package simt_pkg;
         logic [WARP_SIZE-1:0][31:0] addresses; // Per-thread addresses for scatter/gather
         logic last_split;                      // 1=Final split for this instruction (clears Scoreboard)
     } pending_load_t;
+
+    // Replay Queue Entry Structure
+    typedef struct packed {
+        logic valid;
+        logic [WARP_SIZE-1:0] pending_mask;
+        logic [7:0] warp;
+        logic [7:0] rd;
+        opcode_t op; // Changed from logic [7:0] to opcode_t for type safety
+        logic [WARP_SIZE-1:0][31:0] addresses;
+        logic [WARP_SIZE-1:0][31:0] store_data;
+    } replay_entry_t;
+
+    // Shared Memory Pipeline Register (for 1-cycle latency)
+    typedef struct packed {
+        logic valid;
+        logic [WARP_ID_WIDTH-1:0] warp;
+        logic [REG_ADDR_WIDTH-1:0] rd;
+        logic [WARP_SIZE-1:0] mask;
+    } shared_wb_req_t;
+
+    typedef struct packed {
+        logic valid;
+        logic [WARP_ID_WIDTH-1:0] warp;
+        logic [REG_ADDR_WIDTH-1:0] rd;
+        logic [WARP_SIZE-1:0] mask;
+        logic [WARP_SIZE-1:0][31:0] data;
+    } shared_wb_resp_t;
 
     // Function: Check if instruction is a memory operation
     function automatic logic is_memory_op(opcode_t op);
