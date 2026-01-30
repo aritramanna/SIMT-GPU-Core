@@ -5,7 +5,7 @@ module mock_memory
     parameter ADDR_WIDTH = 32,
     parameter DATA_WIDTH = 32,
     parameter LINE_SIZE  = 128, // Bytes
-    parameter MEM_SIZE   = 16384 // 16KB
+    parameter MEM_SIZE   = 33554432 // 32MB
 )(
     input  logic clk,
     input  logic rst_n,
@@ -30,14 +30,14 @@ module mock_memory
 );
 
     // ---------------------------------------------------------
-    // 1. Memory Array (16KB)
+    // 1. Memory Array (Associative, Sparse 32MB)
     // ---------------------------------------------------------
-    // 16KB / 128B Line = 128 Lines
-    logic [1023:0] mem [0:127];
+    // Using associative array to model large memory without allocating it all
+    logic [1023:0] mem [int];
 
     // Function to get line index
-    function automatic logic [6:0] get_line_idx(logic [31:0] addr);
-        return addr[13:7]; // Bits 13..7 for 128 lines
+    function automatic int get_line_idx(logic [31:0] addr);
+        return int'(addr >> 7); // Divide by 128 (Line Size)
     endfunction
 
     // ---------------------------------------------------------
@@ -73,6 +73,7 @@ module mock_memory
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             // Reset logic
+            queue = {};
         end else begin
             if (req_valid) begin
                 packet_t new_pkt;
@@ -100,6 +101,7 @@ module mock_memory
             pending_valid <= 0;
             resp_valid <= 0;
             current_delay <= 0;
+            // Memory must NOT be cleared on reset to support backdoor init
         end else begin
             // Default Pulsed Output
             resp_valid <= 0;
@@ -109,14 +111,17 @@ module mock_memory
                     current_delay <= current_delay - 1;
                 end else begin
                     // Done waiting, Execute!
-                    logic [6:0] idx;
+                    int idx;
                     idx = get_line_idx(pending_pkt.addr);
 
                     if (pending_pkt.we) begin
                         // WRITE with Mask
+                        // If line doesn't exist, initialize it first
+                        if (!mem.exists(idx)) mem[idx] = '0;
+
                         for (int i=0; i<32; i++) begin
                             if (pending_pkt.mask[i]) begin
-                                mem[idx][i*32 +: 32] <= pending_pkt.wdata[i*32 +: 32];
+                                mem[idx][i*32 +: 32] = pending_pkt.wdata[i*32 +: 32];
                             end
                         end
                         // Send Write Ack (Reuse resp_valid)
@@ -129,7 +134,12 @@ module mock_memory
                         resp_valid          <= 1;
                         resp_warp_id        <= pending_pkt.warp_id;
                         resp_transaction_id <= pending_pkt.transaction_id;
-                        resp_rdata          <= mem[idx];
+                        // Return 0 if not initialized
+                        if (mem.exists(idx)) begin
+                            resp_rdata <= mem[idx];
+                        end else begin
+                            resp_rdata <= '0;
+                        end
                     end
                     
                     pending_valid <= 0; // Done with this packet

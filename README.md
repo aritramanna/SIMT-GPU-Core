@@ -11,7 +11,7 @@ The **Kepler-Style SIMT Core** is an **educational, behavioral model** of a Gene
 - **Multithreading**: Fine-Grained Multithreading (FGMT) with 24 warps (768 threads) and zero-overhead context switching.
 - **Memory Model**:
   - **Shared Memory**: 16KB On-Chip Scratchpad (32 banks) with bank-conflict replay.
-  - **Global Memory**: Coalesced Load/Store Unit (LSU) with **Multi-Line Split Support**.
+  - **Global Memory**: **32MB Sparse Address Space** (Associative-Array backed) with Coalesced Load/Store Unit (LSU) and **Multi-Line Split Support**.
   - **MSHR**: Up to 64 outstanding memory transactions per warp with out-of-order completion.
 - **Synchronization**: Hardware Barrier (`BAR`) with Epoch consistency.
 - **Graphics Pipeline**: Hardware-accelerated 3D wireframe rendering with **Perspective Projection** and dynamic rotation.
@@ -366,6 +366,15 @@ ISETP.GT P1, R_x, 0
 
 <img width="2816" height="1536" alt="Gemini_Generated_Image_lved18lved18lved" src="https://github.com/user-attachments/assets/b5b16378-6fa1-47d8-9ec4-da306981f358" />
 
+### 4.6 Global Memory Architecture (LSU & MSHR)
+
+The Global Memory subsystem handles off-chip memory requests using a sophisticated Load/Store Unit (LSU) capable of hiding latency and managing complex access patterns.
+
+- **Physical Memory Model (Mock Memory)**:
+  - The Simulation utilizes a **32MB Sparse Memory Model** implemented via SystemVerilog associative arrays (`logic [1023:0] mem [int]`).
+  - This allows the core to address a large 32MB range (e.g., for large framebuffers or matrices) while only allocating storage for accessed cache lines, keeping simulation memory footprint low.
+  - Supports 128-byte line bursts, mimicking a DDR burst or L2 Cache line helper.
+
 - **LSU Split Handling**: The LSU automatically detects when a warp's memory accesses span multiple 128-byte cache lines. It utilizes a **Replay Queue** to serialize these into multiple sequential requests to the memory system, transparently to the warp scheduler.
 
 - **MSHR (Miss Status Holding Registers)**: Each warp has a **64-entry MSHR table** that tracks pending memory operations, allowing the core to hide massive memory latencies.
@@ -695,7 +704,7 @@ The graph above visualizes the cycle-by-cycle activity of the functional units o
 ### 5.7 Limitations & Future Work
 
 - **Rasterization**: Currently supports point-based vertex rendering; full triangle rasterization is a future milestone.
-- **L1 Cache**: While the LSU supports splits, the current model uses a `mock_memory`. Integration with a genuine set-associative L1 cache is planned as a next step.
+- **L1 Cache**: The current `mock_memory` provides an ideal memory abstraction (associative sparse 32MB). Future work will replace this with a realistic set-associative L1 Data Cache / L2 Shared Cache hierarchy to model cache misses and eviction policies cycle-accurately.
 
 ![Future Work](RTL/Docs/future_architecture_concept.png)
 
